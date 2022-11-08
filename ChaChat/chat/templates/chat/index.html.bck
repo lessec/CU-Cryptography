@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8">
+    <title>Chat</title>
+    <style>
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            background-color: white;
+        }
+        #wrap {
+            width: 100%;
+            height: 100%;
+            overflow: scroll;
+            background-color: white;
+        }
+        #chatWrap {
+            width: 500px;
+            height: 820px;
+            margin: auto;
+            border-radius: 12px;
+            border: 1px solid gray;
+            background-color: white;
+        }
+        #chatView {
+            width: 100%;
+            height: 90%;
+            overflow-x: hidden;
+            overflow-y: scroll;
+        }
+        .system {
+            width: 100%;
+            text-align: center;
+            font-size: large;
+            color: darkgray;
+        }
+        .chatLine {
+            height: auto;
+            padding: 10px;
+            overflow: hidden;
+            text-align: left;
+        }
+        .nick {
+            display: block;
+            margin-left: 1%;
+            font-size: large;
+            font-weight: bold;
+            color: black;
+        }
+        .chatLog {
+            max-width: 50%;
+            height: 100%;
+            padding: 8px;
+            border-radius: 18px;
+            display: inline-block;
+            word-break: break-all;
+            font-size: large;
+            background-color: lightgreen;
+        }
+        .me {
+            float: right;
+            background-color: lightskyblue;
+        }
+        #sendForm {
+            height: 10%;
+            padding: 5px;
+            border-top: 1px solid white;
+            text-align: center;
+        }
+        #name {
+            width: 18%;
+            height: 50px;
+            font-size: 20px;
+            border-radius: 8px;
+        }
+        #message {
+            width: 80%;
+            height: 20px;
+            font-size: 10px;
+        }
+    </style>
+</head>
+
+
+
+<body>
+    <div id="wrap">
+        <div id="chatWrap">
+            <div id="chatView"></div>
+            <form id="sendForm" onsubmit="return false">
+                <input type="text" id="message" placeholder=" Enter messages" autocomplete="off">
+                <input type="submit" id="send" value="Send">
+            </form>
+        </div>
+    </div>
+    
+    <script src="http://code.jquery.com/jquery-latest.js"></script>
+    <script>
+        function getName(names) {
+            while (true) {
+                const input = prompt("Enter name\n(length: 2-12)");
+                const uniqueCondition = names.indexOf(input) === -1;
+                const lengthCondition = input && input.length <= 12 && input.length >= 2;
+
+                if (!uniqueCondition) {
+                    alert("This is a duplicate name")
+                } else if (!lengthCondition) {
+                    alert("Please follow the conditions and enter.");
+                } else {
+                    return input;
+                }
+            }
+        }
+
+        function drawUserEnterAlert(name) {
+            const html = `
+                <div class="system">
+                    ${name} has connected
+                </div>`;
+
+            $("#chatView").append(html).scrollTop($("#chatView")[0].scrollHeight);
+        }
+
+        function drawMessage(name, message) {
+            const html = `
+                <div class="chatLine">
+                    <label class="nick">${name}</label>
+                    <div class="chatLog">
+                        ${message}
+                    </div>
+                </div>`;
+
+            $("#chatView").append(html).scrollTop($("#chatView")[0].scrollHeight);
+        }
+
+        function drawMyMessage(message) {
+            const html = `
+                <div class="chatLine">
+                    <div class="chatLog me">
+                        ${message}
+                    </div>
+                </div>`;
+
+            $("#chatView").append(html).scrollTop($("#chatView")[0].scrollHeight);
+            $("#message").val("");
+        }
+
+        function drawUserExitAlert(name) {
+            const html = `
+                <div class="system">
+                    ${name} has disconnected
+                </div>`;
+
+            $("#chatView").append(html).scrollTop($("#chatView")[0].scrollHeight);
+        }
+
+        $(document).ready(() => {
+            const ws = new WebSocket("ws://localhost:8000/chat");
+            let name;
+
+            ws.onopen = (e) => {
+                const data = {
+                    type: "names"
+                };
+
+                ws.send(JSON.stringify(data));
+            };
+
+            ws.onmessage = (e) => {
+                const { type, data } = JSON.parse(e.data);
+
+                if (type === "names") {
+                    name = getName(data);
+
+                    ws.send(JSON.stringify({
+                        type: "connect",
+                        data: {
+                            name
+                        }
+                    }));
+                    drawUserEnterAlert(name);
+                } else if (type === "connect") {
+                    drawUserEnterAlert(data.name);
+                } else if (type === "message") {
+                    drawMessage(data.name, data.message);
+                } else if (type === 'disconnect') {
+                    drawUserExitAlert(data.name);
+                }
+            };
+
+            $("#sendForm").submit(() => {
+                const message = $("#message").val();
+
+                if (message.length > 0) {
+                    const data = {
+                        type: "message",
+                        data: {
+                            name,
+                            message
+                        }
+                    };
+
+                    ws.send(JSON.stringify(data));
+                    drawMyMessage(message);
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
